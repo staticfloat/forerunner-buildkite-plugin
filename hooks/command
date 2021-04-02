@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# For debugging
+#set | grep BUILDKITE_PLUGIN_FORERUNNER
+
+# Do a little bit of parameter checking
+TARGET="${BUILDKITE_PLUGIN_FORERUNNER_TARGET}"
+TARGET_TYPE="${BUILDKITE_PLUGIN_FORERUNNER_TARGET_TYPE:-simple}"
+PATH_PROCESSOR="${BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR}"
+
+# Check for valid `target`
+if [[ ! -f ${TARGET} ]]; then
+    buildkite-agent annotate --style "error" "Invalid target value '${TARGET}'"
+    exit 1
+fi
+
+# Check for valid `target_type`
+case "${TARGET_TYPE}" in
+    simple | template | command)
+        ;;
+    *)
+        buildkite-agent annotate --style "error" "Invalid target_type value '${TARGET_TYPE}'"
+        exit 1
+        ;;
+esac
+
+# If we have a non-simple target, we default to `per-file` path processor
+if [[ "${TARGET_TYPE}" != "simple" ]] && [[ -z "${PATH_PROCESSOR}" ]]; then
+    PATH_PROCESSOR="per-file"
+fi
+
+# Check for valid `path_processor`
+if [[ -n ${PATH_PROCESSOR} ]]; then
+    # A simple target type doesn't deal with paths, so it's illegal to provide a `path_processor` with it
+    if [[ "${TARGET_TYPE}" == "simple" ]]; then
+        buildkite-agent annotate --style "error" "Cannot combine path_processor with a '${TARGET_TYPE}' target_type"
+        exit 1
+    fi
+
+    # If the given path processor is a simple name like `per-file`, look it up in our default library
+    if [[ ! -f ${PATH_PROCESSOR} ]]; then
+        DEFAULT_PP_PATH="$(dirname $(dirname "${BASH_SOURCE[0]}"))/lib/path_processors"
+        if [[ -f "${DEFAULT_PP_PATH}/${PATH_PROCESSOR}" ]]; then
+            PATH_PROCESSOR="${DEFAULT_PP_PATH}/${PATH_PROCESSOR}"
+        else
+            buildkite-agent annotate --style "error" "Invalid path_processor value '${PATH_PROCESSOR}'"
+            exit 1
+        fi
+    fi
+fi
+
+# If we're a pull request, we look at the diff between the current branch tip and the base branch
+if [[ "${BUILDKITE_PULL_REQUEST}" != "false" ]]; then
+    if [[ -z "${BUILDKITE_PLUGIN_FORERUNNER_GIT_FETCHED}" ]]; then
+        git fetch origin "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        git fetch origin "refs/pull/${BUILDKITE_PULL_REQUEST}/head:refs/remotes/origin/pr/${BUILDKITE_PULL_REQUEST}"
+
+        # Ensure that if this plugin is run multiple times, we don't try to fetch every time
+        export BUILDKITE_PLUGIN_FORERUNNER_GIT_FETCHED=1
+    fi
+    TARGET_BRANCH="remotes/origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+    COMPARE_AGAINST="$(git merge-base --fork-point ${TARGET_BRANCH} HEAD)"
+else
+    # If we're not a pull request, just compare with `HEAD~1`.
+    COMPARE_AGAINST="$(git rev-parse HEAD~1)"
+fi
+
+# Get list of modified files, store in `MODIFIED_FILES`
+CURR_HEAD="$(git rev-parse HEAD)"
+MODIFIED_FILES=( $(git diff-tree --no-commit-id --name-only -r HEAD "${COMPARE_AGAINST}") )
+
+echo "Found ${#MODIFIED_FILES[@]} modified files between ${CURR_HEAD} and ${COMPARE_AGAINST}"
+
+# For each pattern we've been given, check if any of the modified files matches
+PATTERN_IDX=0
+MATCHED_FILES=()
+while [[ -v "BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}_PATH" ]]; do
+    # Fetch the pattern
+    PATTERN_VARNAME="BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}_PATH"
+    PATTERN="${!PATTERN_VARNAME}"
+
+    # Iterate over our changed files, checking to see if any match the pattern we're interested in
+    for FILE in "${MODIFIED_FILES[@]}"; do
+        if [[ "${FILE}" =~ ${PATTERN} ]]; then
+            echo "File '${FILE}' matched pattern '${PATTERN}'"
+            MATCHED_FILES+=( ${FILE} )
+        fi
+    done
+
+    PATTERN_IDX=$((${PATTERN_IDX} + 1))
+done
+
+# If a path processor has been given, pass the results to it to filter down some more
+if [[ -n "${PATH_PROCESSOR}" ]]; then
+    # Overwrite `MATCHED_FILES` with the de-duplicated processed paths
+    echo "Invoking ${PATH_PROCESSOR} on ${#MATCHED_FILES[@]} files..."
+    MATCHED_FILES=( $(${PATH_PROCESSOR} "${MATCHED_FILES[@]}") )
+fi
+
+echo "+++ pipeline invocations"
+
+# If we are a "simple" target, the only thing we are about is that `MATCHED_FILES` is non-empty
+if [[ "${TARGET_TYPE}" == "simple" ]] && [[ ${#MATCHED_FILES[@]} -ne 0 ]]; then
+    echo "Triggering simple pipeline ${TARGET}"
+    buildkite-agent pipeline upload "${TARGET}"
+    exit 0
+fi
+
+# If we are a "template" target, we iterate over the matched files, using `sed` to template a .yml
+if [[ "${TARGET_TYPE}" == "template" ]]; then
+    for PP_PATH in "${MATCHED_FILES[@]}"; do
+        echo "Triggering template pipeline ${TARGET} with {PATH}='${PP_PATH}'"
+        sed -e "s&{PATH}&${PP_PATH}&g" < "${TARGET}" | buildkite-agent pipeline upload
+    done
+fi
+
+# And the same for a "command" target, only we don't pipe to `buildkite-agent pipeline upload`, we'll let the command do that.
+if [[ "${TARGET_TYPE}" == "command" ]]; then
+    for PP_PATH in "${MATCHED_FILES[@]}"; do
+        echo "Triggering command pipeline ${TARGET} '${PP_PATH}'"
+        ${TARGET} "${PP_PATH}"
+    done
+fi

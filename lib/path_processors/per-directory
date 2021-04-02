@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# De-duplicate directories, and turn top-level files into `.`
+declare -A DIRS
+for f in "$@"; do
+    DIR="$(dirname ${f})"
+    DIRS["${DIR:-.}"]=1
+done
+echo "${!DIRS[@]}"

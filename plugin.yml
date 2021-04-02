@@ -1,0 +1,18 @@
+name: Forerunner
+description: Dynamically trigger templated buildkite pipelines on git diffs
+author: https://github.com/staticfloat
+configuration:
+  properties:
+    watch:
+      type: array
+      properties:
+        path:
+          type: string
+          minimum: 1
+    path_processor:
+      type: string
+    target:
+      type: string
+    target_type:
+      type: string
+  additionalProperties: false
