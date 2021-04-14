@@ -59,7 +59,7 @@ if [[ "${BUILDKITE_PULL_REQUEST}" != "false" ]]; then
         export BUILDKITE_PLUGIN_FORERUNNER_GIT_FETCHED=1
     fi
     TARGET_BRANCH="remotes/origin/${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-    COMPARE_AGAINST="$(git merge-base --fork-point ${TARGET_BRANCH} HEAD)"
+    COMPARE_AGAINST="$(git merge-base ${TARGET_BRANCH} HEAD)"
 else
     # If we're not a pull request, just compare with `HEAD~1`.
     COMPARE_AGAINST="$(git rev-parse HEAD~1)"
