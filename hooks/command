@@ -65,9 +65,9 @@ else
     COMPARE_AGAINST="$(git rev-parse HEAD~1)"
 fi
 
-# Get list of modified files, store in `MODIFIED_FILES`
+# Get list of modified files (excluding deletes), store in `MODIFIED_FILES`
 CURR_HEAD="$(git rev-parse HEAD)"
-MODIFIED_FILES=( $(git diff-tree --no-commit-id --name-only -r HEAD "${COMPARE_AGAINST}") )
+MODIFIED_FILES=( $(git diff-tree --diff-filter=d --name-only -r "${COMPARE_AGAINST}" HEAD) )
 
 echo "Found ${#MODIFIED_FILES[@]} modified files between ${CURR_HEAD} and ${COMPARE_AGAINST}"
 
