@@ -10,6 +10,7 @@ PATH_PROCESSOR="${BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR}"
 
 # Check for valid `target`
 if [[ ! -f ${TARGET} ]]; then
+    echo "ERROR: Invalid target value '${TARGET}'" >&2
     buildkite-agent annotate --style "error" "Invalid target value '${TARGET}'"
     exit 1
 fi
@@ -19,6 +20,7 @@ case "${TARGET_TYPE}" in
     simple | template | command)
         ;;
     *)
+        echo "ERROR: Invalid target_type value '${TARGET_TYPE}'" >&2
         buildkite-agent annotate --style "error" "Invalid target_type value '${TARGET_TYPE}'"
         exit 1
         ;;
@@ -33,6 +35,7 @@ fi
 if [[ -n ${PATH_PROCESSOR} ]]; then
     # A simple target type doesn't deal with paths, so it's illegal to provide a `path_processor` with it
     if [[ "${TARGET_TYPE}" == "simple" ]]; then
+        echo "ERROR: Cannot combine path_processor with a '${TARGET_TYPE}' target_type" >&2
         buildkite-agent annotate --style "error" "Cannot combine path_processor with a '${TARGET_TYPE}' target_type"
         exit 1
     fi
@@ -43,6 +46,7 @@ if [[ -n ${PATH_PROCESSOR} ]]; then
         if [[ -f "${DEFAULT_PP_PATH}/${PATH_PROCESSOR}" ]]; then
             PATH_PROCESSOR="${DEFAULT_PP_PATH}/${PATH_PROCESSOR}"
         else
+            echo "ERROR: Invalid path_processor value '${PATH_PROCESSOR}'" >&2
             buildkite-agent annotate --style "error" "Invalid path_processor value '${PATH_PROCESSOR}'"
             exit 1
         fi
