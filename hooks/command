@@ -113,8 +113,10 @@ fi
 # If we are a "template" target, we iterate over the matched files, using `sed` to template a .yml
 if [[ "${TARGET_TYPE}" == "template" ]]; then
     for PP_PATH in "${MATCHED_FILES[@]}"; do
+        # Provide the user a santized form of the path, for use in keys and whatnot
+        SANITIZED_PP_PATH=$(tr '/' '-' <<< "${PP_PATH}" | tr '.' '-' | tr ' ' '_')
         echo "Triggering template pipeline ${TARGET} with {PATH}='${PP_PATH}'"
-        sed -e "s&{PATH}&${PP_PATH}&g" < "${TARGET}" | buildkite-agent pipeline upload
+        sed -e "s&{PATH}&${PP_PATH}&g" -e "s&{SANITIZED_PATH}&${SANITIZED_PP_PATH}&g" < "${TARGET}" | buildkite-agent pipeline upload
     done
 fi
 
