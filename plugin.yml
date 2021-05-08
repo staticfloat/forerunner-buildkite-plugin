@@ -5,10 +5,6 @@ configuration:
   properties:
     watch:
       type: array
-      properties:
-        path:
-          type: string
-          minimum: 1
     path_processor:
       type: string
     target:

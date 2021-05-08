@@ -3,6 +3,11 @@
 # For debugging
 #set | grep BUILDKITE_PLUGIN_FORERUNNER
 
+# Initialize the features we need
+set -eou pipefail
+shopt -s extglob
+shopt -s globstar
+
 # Do a little bit of parameter checking
 TARGET="${BUILDKITE_PLUGIN_FORERUNNER_TARGET}"
 TARGET_TYPE="${BUILDKITE_PLUGIN_FORERUNNER_TARGET_TYPE:-simple}"
@@ -78,14 +83,14 @@ echo "Found ${#MODIFIED_FILES[@]} modified files between ${CURR_HEAD} and ${COMP
 # For each pattern we've been given, check if any of the modified files matches
 PATTERN_IDX=0
 MATCHED_FILES=()
-while [[ -v "BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}_PATH" ]]; do
+while [[ -v "BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}" ]]; do
     # Fetch the pattern
-    PATTERN_VARNAME="BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}_PATH"
+    PATTERN_VARNAME="BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}"
     PATTERN="${!PATTERN_VARNAME}"
 
     # Iterate over our changed files, checking to see if any match the pattern we're interested in
     for FILE in "${MODIFIED_FILES[@]}"; do
-        if [[ "${FILE}" =~ ${PATTERN} ]]; then
+        if [[ "${FILE}" == @(${PATTERN}) ]]; then
             echo "File '${FILE}' matched pattern '${PATTERN}'"
             MATCHED_FILES+=( ${FILE} )
         fi
