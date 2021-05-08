@@ -11,7 +11,7 @@ shopt -s globstar
 # Do a little bit of parameter checking
 TARGET="${BUILDKITE_PLUGIN_FORERUNNER_TARGET}"
 TARGET_TYPE="${BUILDKITE_PLUGIN_FORERUNNER_TARGET_TYPE:-simple}"
-PATH_PROCESSOR="${BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR}"
+PATH_PROCESSOR=""
 
 # Check for valid `target`
 if [[ ! -f ${TARGET} ]]; then
@@ -31,21 +31,19 @@ case "${TARGET_TYPE}" in
         ;;
 esac
 
-# If we have a non-simple target, we default to `per-file` path processor
-if [[ "${TARGET_TYPE}" != "simple" ]] && [[ -z "${PATH_PROCESSOR}" ]]; then
-    PATH_PROCESSOR="per-file"
-fi
-
-# Check for valid `path_processor`
-if [[ -n ${PATH_PROCESSOR} ]]; then
-    # A simple target type doesn't deal with paths, so it's illegal to provide a `path_processor` with it
-    if [[ "${TARGET_TYPE}" == "simple" ]]; then
+# A simple target type doesn't deal with paths, so it's illegal to provide a `path_processor` with it
+if [[ "${TARGET_TYPE}" == "simple" ]]; then
+    
+    if [[ -v "BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR" ]]; then
         echo "ERROR: Cannot combine path_processor with a '${TARGET_TYPE}' target_type" >&2
         buildkite-agent annotate --style "error" "Cannot combine path_processor with a '${TARGET_TYPE}' target_type"
         exit 1
     fi
+else
+    # Otherwise, default to a `per-file` processor.
+    PATH_PROCESSOR="${BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR:-per-file}"
 
-    # If the given path processor is a simple name like `per-file`, look it up in our default library
+    # If the given path processor is a name like `per-file`, look it up in our default library
     if [[ ! -f ${PATH_PROCESSOR} ]]; then
         DEFAULT_PP_PATH="$(dirname $(dirname "${BASH_SOURCE[0]}"))/lib/path_processors"
         if [[ -f "${DEFAULT_PP_PATH}/${PATH_PROCESSOR}" ]]; then
