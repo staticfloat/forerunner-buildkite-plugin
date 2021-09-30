@@ -35,27 +35,27 @@ steps:
       - staticfloat/forerunner:
           # This will create one job per file
           watch:
-            - path: library/**/*.jl
+            - library/**/*.jl
           path_processor: per-file
           target: .buildkite/process_julia_code.yml
           target_type: template
       - staticfloat/forerunner:
           # This will create one job per project directory
           watch:
-            - path: library/**/*
+            - library/**/*
           path_processor: .buildkite/path_processors/per-project
           target: .buildkite/library_project.yml
           target_type: template
       - staticfloat/forerunner:
           # This will create one job overall, throwing all path information away
           watch:
-            - path: src/**/*.jl
-            - path: .*\\.toml
+            - "src/**/*.jl"
+            - "**/*.toml"
           target: .buildkite/run_tests.yml
       - staticfloat/forerunner:
           # This will run an arbitrary command targeting each file changed
           watch:
-            - path: **/*/Project.toml
+            - "**/*/Project.toml"
           path_processor: per-file
           target: .buildkite/commands/create_update_project_pipeline.sh
           target_type: command
