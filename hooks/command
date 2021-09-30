@@ -88,6 +88,7 @@ while [[ -v "BUILDKITE_PLUGIN_FORERUNNER_WATCH_${PATTERN_IDX}" ]]; do
 
     # Iterate over our changed files, checking to see if any match the pattern we're interested in
     for FILE in "${MODIFIED_FILES[@]}"; do
+        echo "Checking ${FILE} against ${PATTERN}"
         if [[ "${FILE}" == @(${PATTERN}) ]]; then
             echo "File '${FILE}' matched pattern '${PATTERN}'"
             MATCHED_FILES+=( ${FILE} )
