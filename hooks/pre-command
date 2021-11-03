@@ -22,7 +22,7 @@ fi
 
 # Check for valid `target_type`
 case "${TARGET_TYPE}" in
-    simple | template | command)
+    simple | simple-env | template | template-env | command )
         ;;
     *)
         echo "ERROR: Invalid target_type value '${TARGET_TYPE}'" >&2
@@ -33,7 +33,6 @@ esac
 
 # A simple target type doesn't deal with paths, so it's illegal to provide a `path_processor` with it
 if [[ "${TARGET_TYPE}" == "simple" ]]; then
-    
     if [[ -v "BUILDKITE_PLUGIN_FORERUNNER_PATH_PROCESSOR" ]]; then
         echo "ERROR: Cannot combine path_processor with a '${TARGET_TYPE}' target_type" >&2
         buildkite-agent annotate --style "error" "Cannot combine path_processor with a '${TARGET_TYPE}' target_type"
@@ -104,23 +103,45 @@ if [[ -n "${PATH_PROCESSOR}" ]]; then
     MATCHED_FILES=( $(${PATH_PROCESSOR} "${MATCHED_FILES[@]}") )
 fi
 
+# Helper function to export a target
+export_target() {
+    # The eventual consumer of this data should walk over `BUILDKITE_PLUGIN_FORERUNNER_TARGET_NAMES`,
+    # looking for a target that matches a pattern, then use the same index to find the pipeline to upload.
+    export BUILDKITE_PLUGIN_FORERUNNER_TARGET_NAMES="${BUILDKITE_PLUGIN_FORERUNNER_TARGET_NAMES:-} ${1}"
+    export BUILDKITE_PLUGIN_FORERUNNER_TARGETS="${BUILDKITE_PLUGIN_FORERUNNER_TARGETS:-} ${2}"
+}
+
 echo "+++ pipeline invocations"
 
 # If we are a "simple" target, the only thing we are about is that `MATCHED_FILES` is non-empty
-if [[ "${TARGET_TYPE}" == "simple" ]] && [[ ${#MATCHED_FILES[@]} -ne 0 ]]; then
+if [[ "${TARGET_TYPE}" == simple* ]] && [[ ${#MATCHED_FILES[@]} -ne 0 ]]; then
     echo "Triggering simple pipeline ${TARGET}"
-    buildkite-agent pipeline upload "${TARGET}"
+    if [[ "${TARGET_TYPE}" == "simple" ]]; then
+        buildkite-agent pipeline upload "${TARGET}"
+    elif [[ "${TARGET_TYPE}" == "simple-env" ]]; then
+        # This means all we want is for an environment variable to be set, pointing to the pipeline:
+        export_target "${TARGET}" "${TARGET}"
+    fi
     exit 0
 fi
 
 # If we are a "template" target, we iterate over the matched files, using `sed` to template a .yml
-if [[ "${TARGET_TYPE}" == "template" ]]; then
+if [[ "${TARGET_TYPE}" == "template" ]] || [[ "${TARGET_TYPE}" == "template-env" ]]; then
     for PP_PATH in "${MATCHED_FILES[@]}"; do
         # Provide the user a santized form of the path, for use in keys and whatnot
-        SANITIZED_PP_PATH=$(tr '/' '-' <<< "${PP_PATH}" | tr '.' '-' | tr ' ' '_')
-        echo "Triggering template pipeline ${TARGET} with {PATH}='${PP_PATH}'"
-        sed -e "s&{PATH}&${PP_PATH}&g" -e "s&{SANITIZED_PATH}&${SANITIZED_PP_PATH}&g" < "${TARGET}" | buildkite-agent pipeline upload
+        SANITIZED_PP_PATH=$(tr '/' '_' <<< "${PP_PATH}" | tr '.' '_' | tr ' ' '_')
+        TEMPLATED_PIPELINE_PATH="$(mktemp --tmpdir ${SANITIZED_PP_PATH}.XXXXXXXX.yml)"
+        echo "Triggering template pipeline ${TARGET} with {PATH}='${PP_PATH}', writing out to ${TEMPLATED_PIPELINE_PATH}"
+        sed -e "s&{PATH}&${PP_PATH}&g" -e "s&{SANITIZED_PATH}&${SANITIZED_PP_PATH}&g" < "${TARGET}" > "${TEMPLATED_PIPELINE_PATH}"
+
+        if [[ "${TARGET_TYPE}" == "template" ]]; then
+            buildkite-agent pipeline upload "${TEMPLATED_PIPELINE_PATH}"
+        elif [[ "${TARGET_TYPE}" == "template-env" ]]; then
+            # This means all we want is for an environment variable to be set, pointing to the pipeline:
+            export_target "${TARGET}" "${TEMPLATED_PIPELINE_PATH}"
+        fi
     done
+    exit 0
 fi
 
 # And the same for a "command" target, only we don't pipe to `buildkite-agent pipeline upload`, we'll let the command do that.
@@ -129,4 +150,5 @@ if [[ "${TARGET_TYPE}" == "command" ]]; then
         echo "Triggering command pipeline ${TARGET} '${PP_PATH}'"
         ${TARGET} "${PP_PATH}"
     done
+    exit 0
 fi
