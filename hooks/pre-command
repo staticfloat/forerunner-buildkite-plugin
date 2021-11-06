@@ -122,7 +122,7 @@ if [[ "${TARGET_TYPE}" == simple* ]] && [[ ${#MATCHED_FILES[@]} -ne 0 ]]; then
         # This means all we want is for an environment variable to be set, pointing to the pipeline:
         export_target "${TARGET}" "${TARGET}"
     fi
-    exit 0
+    return
 fi
 
 # If we are a "template" target, we iterate over the matched files, using `sed` to template a .yml
@@ -141,7 +141,7 @@ if [[ "${TARGET_TYPE}" == "template" ]] || [[ "${TARGET_TYPE}" == "template-env"
             export_target "${TARGET}" "${TEMPLATED_PIPELINE_PATH}"
         fi
     done
-    exit 0
+    return
 fi
 
 # And the same for a "command" target, only we don't pipe to `buildkite-agent pipeline upload`, we'll let the command do that.
@@ -150,5 +150,5 @@ if [[ "${TARGET_TYPE}" == "command" ]]; then
         echo "Triggering command pipeline ${TARGET} '${PP_PATH}'"
         ${TARGET} "${PP_PATH}"
     done
-    exit 0
+    return
 fi
