@@ -59,8 +59,10 @@ fi
 # If we're a pull request, we look at the diff between the current branch tip and the base branch
 if [[ "${BUILDKITE_PULL_REQUEST}" != "false" ]]; then
     if [[ ! -v "BUILDKITE_PLUGIN_FORERUNNER_GIT_FETCHED" ]]; then
-        git fetch origin "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-        git fetch origin "refs/pull/${BUILDKITE_PULL_REQUEST}/head:refs/remotes/origin/pr/${BUILDKITE_PULL_REQUEST}"
+        # The `--force` flags are necessary to be able to deal with rewritten
+        # history on the remotes' end when reusing a repository
+        git fetch --force origin "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        git fetch --force origin "refs/pull/${BUILDKITE_PULL_REQUEST}/head:refs/remotes/origin/pr/${BUILDKITE_PULL_REQUEST}"
 
         # Ensure that if this plugin is run multiple times, we don't try to fetch every time
         export BUILDKITE_PLUGIN_FORERUNNER_GIT_FETCHED=1
