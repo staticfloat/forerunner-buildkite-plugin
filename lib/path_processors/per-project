@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# This script takes in a list of paths and outputs a list of top-level project directories,
+# e.g. directories with `Project.toml` files in them.
+
+declare -A PROJECT_DIRS
+
+# `f` is the full path of each file that was changed
+for f in "$@"; do
+    while [[ "${f}" ]]; do
+        if [[ -f "${f}/Project.toml" ]]; then
+            PROJECT_DIRS["${f}"]=1
+            break
+        fi
+        # update `f` to the path of its parent directory
+        f="$(dirname "${f}")"
+    done
+done
+
+# Output the (de-duplicated) project directories we found
+echo "${!PROJECT_DIRS[@]}"
