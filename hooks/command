@@ -22,7 +22,7 @@ fi
 
 # Check for valid `target_type`
 case "${TARGET_TYPE}" in
-    simple | template | command)
+    simple | template | command | grouped_command)
         ;;
     *)
         echo "ERROR: Invalid target_type value '${TARGET_TYPE}'" >&2
@@ -131,4 +131,10 @@ if [[ "${TARGET_TYPE}" == "command" ]]; then
         echo "Triggering command pipeline ${TARGET} '${PP_PATH}'"
         ${TARGET} "${PP_PATH}"
     done
+fi
+
+# And for a "grouped_command" target, we'll simply pass on the list of all the files changed and let the command take care of uploading the pipeline.
+if [[ "${TARGET_TYPE}" == "grouped_command" ]]; then
+    echo "Triggering grouped command pipeline ${TARGET} for '${MATCHED_FILES[@]}'"
+    ${TARGET} "${MATCHED_FILES[@]}"
 fi

@@ -16,9 +16,11 @@ As of this writing, the three types of targets are `simple`, `template` and `com
   If multiple paths trigger a `template` pipeline, it is triggered once for each path (subject to `path_processor` alterations, detailed below).
 
 * A `command` target is one that invokes a command once for each path (subject to the `path_processor` alterations, detailed below) and is expected to generate pipelines and pass them to `buildkite-agent pipeline upload` itself.
-  This command type is by far the most flexible and allows for truly devious pipelines to be created.
 
-As mentioned above, `template` and `command` targets are, by default, invoked once for each modified file.
+* A `grouped_command` target is one that invokes a command once with all the paths grouped together (subject to the `path_processor` alterations, detailed below). Similar to the `command` target, this is also expected to generate pipelines and pass them to the `buildkite-agent pipeline upload` itself.
+  This target type is by far the most flexible and allows for truly devious pipelines to be created.
+
+As mentioned above, `template` and `command` targets are, by default, invoked once for each modified file, and the `grouped_command` target is, by default, invoked once for an array of all the modified files.
 To control this behavior, the user may provide a `path_processor` argument to munge the paths in an intelligent way.
 By default, `forerunner` uses the `per-file` path processor to template the pipeline once for each file modified.
 However, some pipelines may wish to run upon the directories containing all modified files, or may wish to run once per overall project in a large monorepo.
@@ -59,4 +61,11 @@ steps:
           path_processor: per-file
           target: .buildkite/commands/create_update_project_pipeline.sh
           target_type: command
+      - staticfloat/forerunner:
+          # This will run an arbitrary command targeting a group consisting of all the files modified
+          watch:
+            - "**/*/Project.toml"
+          path_processor: per-file
+          target: .buildkite/commands/collate_and_trigger_pipeline.sh
+          target_type: grouped_command
 ```
